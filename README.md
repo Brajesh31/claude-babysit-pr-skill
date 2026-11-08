@@ -1,50 +1,98 @@
-# Babysit PR
+# claude-babysit-pr-skill
 
-Monitor a GitHub pull request through CI checks, reviews, comments, and merge-readiness changes.
+A Claude Code skill for monitoring a GitHub pull request through CI checks, reviews, comments, and merge-readiness changes.
 
-## Features
+## Overview
 
-- Tracks required CI checks and reports failures.
-- Monitors review activity and unresolved review threads.
-- Detects base-branch changes and merge-state problems.
-- Supports `ready`, `green`, and `any-change` completion modes.
-- Uses a single watcher per pull request and records reported events between runs.
+This skill helps track the state of a pull request while work is waiting on automated checks or human review. It uses a dedicated watcher workflow rather than encouraging ad hoc polling loops.
+
+The watcher reports meaningful changes. A notification is not itself a merge approval: the pull request must still be checked against the repository's actual merge requirements.
+
+## Main Capabilities
+
+- Monitor required CI checks.
+- Detect failed and completed checks.
+- Track review activity and comments.
+- Identify unresolved review threads.
+- Detect base-branch changes and merge conflicts.
+- Support different completion conditions.
+- Maintain watcher state between runs.
+
+## Completion Modes
+
+| Mode | Meaning |
+|---|---|
+| `ready` | Required checks pass, qualifying review conditions are met, and no unresolved review threads remain |
+| `green` | Required checks pass |
+| `any-change` | Stop after the first new event |
+
+The exact merge gate depends on repository branch protection and review policy.
 
 ## Requirements
 
 - GitHub CLI (`gh`) installed and authenticated.
 - Python 3.10 or later.
+- Permission to read the pull request and its check and review status.
 - Access to the repository containing the pull request.
 
 ## Installation
 
-Copy this skill directory into your agent's skills folder. Ensure the helper script is executable:
+Clone the repository into the skills directory:
 
 ```bash
-chmod +x .claude/skills/babysit-pr/scripts/pr-wait
+git clone https://github.com/Brajesh31/claude-babysit-pr-skill.git ~/.claude/skills/babysit-pr
+```
+
+Ensure the helper script is executable:
+
+```bash
+chmod +x ~/.claude/skills/babysit-pr/scripts/pr-wait
 ```
 
 ## Usage
 
-The skill instructions are in `SKILL.md`. The helper can be run directly:
+Invoke the skill when asked to monitor a pull request. The helper can also be run directly:
 
 ```bash
-.claude/skills/babysit-pr/scripts/pr-wait <pr> [--repo owner/name] [--until ready|green|any-change]
+~/.claude/skills/babysit-pr/scripts/pr-wait <pr> [--repo owner/name] [--until ready|green|any-change]
 ```
 
-- `ready`: required checks pass, a qualifying review bot has reviewed the current head, and no review threads remain unresolved.
-- `green`: required checks pass.
-- `any-change`: stop after the first new event.
+Use the repository option when the current working directory does not identify the target repository.
 
-The script uses the GitHub CLI and stores watcher state under `~/.local/state/pr-wait/`.
+## Recommended Workflow
+
+1. Inspect the current PR status and existing review feedback.
+2. Confirm the repository and pull request identifier.
+3. Start one watcher for the target PR.
+4. Wait for a meaningful event rather than repeatedly polling.
+5. Re-check the current checks, reviews, comments, and merge state after notification.
+6. Address required failures or unresolved feedback.
+7. Confirm the actual merge gate before declaring the PR ready.
+
+## State and Resource Management
+
+The helper stores watcher state under:
+
+```text
+~/.local/state/pr-wait/
+```
+
+Use one watcher per pull request. Avoid running duplicate watchers for the same PR because they consume additional API capacity and can produce redundant notifications.
 
 ## Repository Contents
 
-- `SKILL.md`: Pull request monitoring instructions.
-- `scripts/pr-wait`: Python helper that watches a pull request and reports meaningful events.
-- `README.md`: Installation and usage guidance.
-- `LICENSE`: MIT License notices.
+- `SKILL.md`: Pull request monitoring workflow.
+- `scripts/pr-wait`: Helper for monitoring pull request events.
+- `README.md`: Installation, completion modes, and usage.
 
-## License
+## Safety Notes
 
-MIT License. See [LICENSE](LICENSE).
+- Monitor only pull requests that are within the user's authorized work.
+- Do not treat a passing CI run as proof that the change is correct.
+- Re-check the latest head commit after new pushes.
+- Confirm required reviews and unresolved threads.
+- Never merge automatically unless the user explicitly authorized that action and the repository policy permits it.
+
+## Troubleshooting
+
+If the watcher cannot access a PR, verify GitHub CLI authentication and repository permissions. If the watcher reports no change, inspect the PR directly and confirm the selected completion mode and required checks.
